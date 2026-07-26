@@ -58,6 +58,13 @@ syntax-based and reproducible while counting explicit alternative execution
 paths. In particular, `default` is the remaining route after the preceding case
 tests, not another independent decision.
 
+This rule intentionally differs from SwiftLint's `cyclomatic_complexity` rule:
+Flush counts the nil-coalescing operator `??`, while SwiftLint does not. Flush
+counts it because evaluation selects between the optional value and a
+conditionally evaluated fallback, creating an alternative execution path. As a
+result, Flush and SwiftLint cyclomatic-complexity numbers are not directly
+comparable, even when both analyze the same source file.
+
 The source walk may be derived from
 [SlopGuard-Swift](https://github.com/JeevanThandi/SlopGuard-Swift), whose
 function-like coverage and cyclomatic rules match this decision. Only the
