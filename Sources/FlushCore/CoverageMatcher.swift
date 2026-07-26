@@ -252,6 +252,8 @@ public struct CoverageMatcher: Sendable {
             return .missing
         }
         guard
+            let attributes = try? manager.attributesOfItem(atPath: path),
+            hasReadablePermissions(attributes),
             manager.isReadableFile(atPath: path),
             let handle = FileHandle(forReadingAtPath: path)
         else {
@@ -259,12 +261,20 @@ public struct CoverageMatcher: Sendable {
         }
         try? handle.close()
         guard
-            let attributes = try? manager.attributesOfItem(atPath: path),
             let modificationDate = attributes[.modificationDate] as? Date
         else {
             return .unreadable
         }
         return .readable(modificationDate)
+    }
+
+    private func hasReadablePermissions(
+        _ attributes: [FileAttributeKey: Any]
+    ) -> Bool {
+        guard let permissions = attributes[.posixPermissions] as? NSNumber else {
+            return true
+        }
+        return permissions.intValue & 0o444 != 0
     }
 }
 
