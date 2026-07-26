@@ -128,13 +128,26 @@ final class FunctionRegionCollector: SyntaxVisitor {
         ownerName: String
     ) {
         for accessor in accessors {
-            if let body = accessor.body {
-                append(
-                    node: accessor,
-                    body: body,
-                    name: "\(ownerName) [\(accessor.accessorSpecifier.text)]"
-                )
+            guard
+                let accessorName = supportedAccessorName(accessor),
+                let body = accessor.body
+            else {
+                continue
             }
+            append(
+                node: accessor,
+                body: body,
+                name: "\(ownerName) [\(accessorName)]"
+            )
+        }
+    }
+
+    private func supportedAccessorName(_ accessor: AccessorDeclSyntax) -> String? {
+        switch accessor.accessorSpecifier.text {
+        case "get", "set", "willSet", "didSet":
+            accessor.accessorSpecifier.text
+        default:
+            nil
         }
     }
 

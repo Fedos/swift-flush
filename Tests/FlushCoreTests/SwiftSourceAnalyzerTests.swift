@@ -123,6 +123,32 @@ final class SwiftSourceAnalyzerTests: XCTestCase {
         XCTAssertTrue(try analyze(source).isEmpty)
     }
 
+    func testEmitsOnlySupportedAccessors() throws {
+        let source = """
+        var observed = 0 {
+            willSet {}
+            didSet {}
+        }
+        var explicit: Int {
+            get { 0 }
+            set {}
+        }
+        var streamed: Int {
+            _read { yield 0 }
+        }
+        """
+
+        XCTAssertEqual(
+            try analyze(source).map(\.name),
+            [
+                "var observed [willSet]",
+                "var observed [didSet]",
+                "var explicit: Int [get]",
+                "var explicit: Int [set]"
+            ]
+        )
+    }
+
     func testAnalyzesMultipleFilesInPathOrder() throws {
         let directory = makeSourceDirectory()
         let first = try makeSourceFile(
