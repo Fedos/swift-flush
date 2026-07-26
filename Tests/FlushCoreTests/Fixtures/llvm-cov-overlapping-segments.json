@@ -5,13 +5,17 @@
         {
           "filename": "/Users/fedor/clip/swift-flush/Sources/FlushCore/CoverageReaders.swift",
           "segments": [
-            [45, 22, 1, true, false, false],
-            [50, 10, 0, true, true, false],
-            [51, 47, 1, true, false, false],
-            [52, 6, 0, false, false, false],
-            [73, 10, 1, true, true, false],
-            [74, 67, 0, true, true, false],
-            [76, 10, 1, true, false, false]
+            [71, 6, 0, false, false, false],
+            [74, 75, 4, true, true, false],
+            [75, 71, 1, true, true, false],
+            [76, 59, 0, true, true, false],
+            [78, 10, 1, true, true, false],
+            [79, 67, 0, true, true, false],
+            [81, 10, 1, true, false, false],
+            [91, 10, 1, true, true, false],
+            [92, 57, 1, true, true, false],
+            [96, 10, 4, true, false, false],
+            [97, 6, 0, false, false, false]
           ]
         }
       ]

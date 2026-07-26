@@ -29,18 +29,18 @@ final class CoverageReaderTests: XCTestCase {
         XCTAssertEqual(
             files[0].executableLines,
             [
-                LineExecution(line: 45, count: 1),
-                LineExecution(line: 46, count: 1),
-                LineExecution(line: 47, count: 1),
-                LineExecution(line: 48, count: 1),
-                LineExecution(line: 49, count: 1),
-                LineExecution(line: 50, count: 1),
-                LineExecution(line: 51, count: 0),
-                LineExecution(line: 52, count: 1),
-                LineExecution(line: 73, count: 1),
-                LineExecution(line: 74, count: 1),
-                LineExecution(line: 75, count: 0),
-                LineExecution(line: 76, count: 0)
+                LineExecution(line: 74, count: 4),
+                LineExecution(line: 75, count: 4),
+                LineExecution(line: 76, count: 1),
+                LineExecution(line: 77, count: 0),
+                LineExecution(line: 78, count: 1),
+                LineExecution(line: 79, count: 1),
+                LineExecution(line: 80, count: 0),
+                LineExecution(line: 81, count: 0)
+            ] + (82...96).map {
+                LineExecution(line: $0, count: 1)
+            } + [
+                LineExecution(line: 97, count: 4)
             ]
         )
     }

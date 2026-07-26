@@ -221,8 +221,14 @@ struct LLVMCoverageParser {
         activeSegment: LLVMSegment?,
         lineSegments: [LLVMSegment]
     ) -> Int? {
-        if let activeSegment, activeSegment.hasCount, !activeSegment.isGap {
-            return activeSegment.count
+        let activeCount = activeSegment.flatMap {
+            $0.hasCount && !$0.isGap ? $0.count : nil
+        }
+        let regionCounts = lineSegments.filter {
+            $0.hasCount && $0.isRegionEntry && !$0.isGap
+        }.map(\.count)
+        if let count = ([activeCount].compactMap { $0 } + regionCounts).max() {
+            return count
         }
         guard
             lineSegments.first.map({
@@ -230,12 +236,6 @@ struct LLVMCoverageParser {
             }) ?? true
         else {
             return nil
-        }
-        let regionCounts = lineSegments.filter {
-            $0.hasCount && $0.isRegionEntry && !$0.isGap
-        }.map(\.count)
-        if let count = regionCounts.max() {
-            return count
         }
         return lineSegments.filter {
             $0.hasCount && !$0.isGap
