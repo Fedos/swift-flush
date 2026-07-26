@@ -27,9 +27,9 @@ methods. It must not combine those responsibilities.
 A dependency contract is declared by its consumer. Its implementation is named
 an adapter or a `Service`.
 
-The architecture terms `port`, `ports & adapters`, and `hexagonal architecture`,
-including translations of these terms, are prohibited in source code, type names,
-file names, architecture decision records, and issue comments.
+Alternative architecture terminology for dependency contracts and their
+implementations, including translated variants, is prohibited in source code,
+type names, file names, architecture decision records, and issue comments.
 
 ## Attribution
 
