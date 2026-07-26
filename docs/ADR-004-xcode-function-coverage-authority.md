@@ -36,6 +36,13 @@ remain normalized to executable source lines. Xcode inputs instead normalize to
 function summaries while preserving ADR-003's shared identity, freshness, and
 honest-failure rules.
 
+Apple function summaries and LLVM line-oriented coverage can produce different
+numbers for the same source because Apple attributes a nested closure to a
+separate function summary while LLVM line coverage remains inside the enclosing
+source region. LLVM coverage defines the reference semantics for v1. Coverage
+numbers produced from these different inputs must not be compared with each
+other. Implementing Xcode coverage is deferred until after v1.
+
 An Xcode function summary is joined to a `FunctionRegion` by the uniquely
 matched source file and the summary's declaration line:
 
@@ -88,4 +95,4 @@ would preserve a known mismatch in the primary Xcode workflow.
 
 ## Status
 
-Proposed
+Accepted
