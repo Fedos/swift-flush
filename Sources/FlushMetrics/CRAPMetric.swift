@@ -37,6 +37,7 @@ public enum CRAPThreshold: Equatable, Sendable {
 }
 
 /// The threshold verdict for a scored function region.
+/// A score greater than the threshold fails, while an equal score passes.
 public enum CRAPVerdict: Equatable, Sendable {
     case pass
     case fail
