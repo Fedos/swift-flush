@@ -33,7 +33,8 @@ let package = Package(
         ),
         .testTarget(
             name: "FlushCoreTests",
-            dependencies: ["FlushCore"]
+            dependencies: ["FlushCore"],
+            resources: [.copy("Fixtures")]
         ),
         .testTarget(
             name: "FlushMetricsTests",
