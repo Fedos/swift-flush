@@ -1,0 +1,22 @@
+{
+  "data": [
+    {
+      "files": [
+        {
+          "filename": "/Users/fedor/clip/swift-flush/Sources/FlushCore/CoverageReaders.swift",
+          "segments": [
+            [45, 22, 1, true, false, false],
+            [50, 10, 0, true, true, false],
+            [51, 47, 1, true, false, false],
+            [52, 6, 0, false, false, false],
+            [73, 10, 1, true, true, false],
+            [74, 67, 0, true, true, false],
+            [76, 10, 1, true, false, false]
+          ]
+        }
+      ]
+    }
+  ],
+  "type": "llvm.coverage.json.export",
+  "version": "3.0.1"
+}

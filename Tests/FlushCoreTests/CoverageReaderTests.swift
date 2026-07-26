@@ -21,6 +21,30 @@ final class CoverageReaderTests: XCTestCase {
         )
     }
 
+    func testMatchesRealLLVMLineViewForOverlappingSegments() throws {
+        let files = try LLVMCoverageParser().parse(
+            fixtureData(named: "llvm-cov-overlapping-segments")
+        )
+
+        XCTAssertEqual(
+            files[0].executableLines,
+            [
+                LineExecution(line: 45, count: 1),
+                LineExecution(line: 46, count: 1),
+                LineExecution(line: 47, count: 1),
+                LineExecution(line: 48, count: 1),
+                LineExecution(line: 49, count: 1),
+                LineExecution(line: 50, count: 1),
+                LineExecution(line: 51, count: 0),
+                LineExecution(line: 52, count: 1),
+                LineExecution(line: 73, count: 1),
+                LineExecution(line: 74, count: 1),
+                LineExecution(line: 75, count: 0),
+                LineExecution(line: 76, count: 0)
+            ]
+        )
+    }
+
     func testLLVMReaderUsesOnlyExplicitInputs() throws {
         let binary = URL(fileURLWithPath: "/selected/FlushTests")
         let profile = URL(fileURLWithPath: "/selected/default.profdata")

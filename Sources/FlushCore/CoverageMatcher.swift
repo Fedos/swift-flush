@@ -170,7 +170,7 @@ public struct CoverageMatcher: Sendable {
             return unavailable(region, reason: .noExecutableLines)
         }
         let coveredLineCount = relevant.values.filter {
-            $0.contains { $0.count > 0 }
+            $0.first?.count ?? 0 > 0
         }.count
         let executableLineCount = relevant.count
         let coverage = Double(coveredLineCount) / Double(executableLineCount)

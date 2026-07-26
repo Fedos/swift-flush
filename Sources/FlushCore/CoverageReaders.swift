@@ -1,5 +1,6 @@
-// CoverageReaders normalize explicitly selected LLVM inputs.
+// Derived from https://github.com/pproenca/crap4swift and https://github.com/JordanCoin/crap4swift.
 
+import Dispatch
 import Foundation
 
 protocol CommandExecuting: Sendable {
@@ -35,8 +36,12 @@ struct ProcessCommandExecutor: CommandExecuting {
         process.standardOutput = output
         process.standardError = error
 
+        let completion = DispatchSemaphore(value: 0)
+        process.terminationHandler = { _ in
+            completion.signal()
+        }
         try process.run()
-        process.waitUntilExit()
+        completion.wait()
         try output.close()
         try error.close()
 
@@ -142,7 +147,7 @@ struct LLVMCoverageParser {
         let segments = try rawSegments.map(parseSegment)
         return SourceFileCoverage(
             path: path,
-            executableLines: expand(segments)
+            executableLines: lineExecutions(segments)
         )
     }
 
@@ -153,6 +158,7 @@ struct LLVMCoverageParser {
             let column = integer(values[1]),
             let count = integer(values[2]),
             let hasCount = values[3] as? Bool,
+            let isRegionEntry = values[4] as? Bool,
             let isGap = values[5] as? Bool
         else {
             throw CoverageInputError.malformedNativeOutput(tool: "llvm-cov")
@@ -162,28 +168,78 @@ struct LLVMCoverageParser {
             column: column,
             count: count,
             hasCount: hasCount,
+            isRegionEntry: isRegionEntry,
             isGap: isGap
         )
     }
 
-    private func expand(_ segments: [LLVMSegment]) -> [LineExecution] {
-        segments.indices.flatMap { index -> [LineExecution] in
-            let segment = segments[index]
-            guard segment.hasCount, !segment.isGap else {
-                return []
+    private func lineExecutions(
+        _ segments: [LLVMSegment]
+    ) -> [LineExecution] {
+        guard !segments.isEmpty else {
+            return []
+        }
+        let sorted = segments.sorted {
+            ($0.line, $0.column) < ($1.line, $1.column)
+        }
+        var executions: [LineExecution] = []
+        var segmentIndex = 0
+        var activeSegment: LLVMSegment?
+        for line in sorted[0].line...sorted[sorted.count - 1].line {
+            let lineSegments = segmentsForLine(
+                on: line,
+                in: sorted,
+                index: &segmentIndex
+            )
+            if let count = executionCount(
+                activeSegment: activeSegment,
+                lineSegments: lineSegments
+            ) {
+                executions.append(LineExecution(line: line, count: count))
             }
-            guard index + 1 < segments.count else {
-                return [LineExecution(line: segment.line, count: segment.count)]
-            }
-            let next = segments[index + 1]
-            let lastLine = next.column == 1 ? next.line - 1 : next.line
-            guard lastLine >= segment.line else {
-                return [LineExecution(line: segment.line, count: segment.count)]
-            }
-            return (segment.line...lastLine).map {
-                LineExecution(line: $0, count: segment.count)
+            if let last = lineSegments.last {
+                activeSegment = last
             }
         }
+        return executions
+    }
+
+    private func segmentsForLine(
+        on line: Int,
+        in segments: [LLVMSegment],
+        index: inout Int
+    ) -> [LLVMSegment] {
+        var lineSegments: [LLVMSegment] = []
+        while index < segments.count, segments[index].line == line {
+            lineSegments.append(segments[index])
+            index += 1
+        }
+        return lineSegments
+    }
+
+    private func executionCount(
+        activeSegment: LLVMSegment?,
+        lineSegments: [LLVMSegment]
+    ) -> Int? {
+        if let activeSegment, activeSegment.hasCount, !activeSegment.isGap {
+            return activeSegment.count
+        }
+        guard
+            lineSegments.first.map({
+                $0.hasCount || !$0.isRegionEntry
+            }) ?? true
+        else {
+            return nil
+        }
+        let regionCounts = lineSegments.filter {
+            $0.hasCount && $0.isRegionEntry && !$0.isGap
+        }.map(\.count)
+        if let count = regionCounts.max() {
+            return count
+        }
+        return lineSegments.filter {
+            $0.hasCount && !$0.isGap
+        }.map(\.count).max()
     }
 
     private func integer(_ value: Any) -> Int? {
@@ -196,5 +252,6 @@ private struct LLVMSegment {
     let column: Int
     let count: Int
     let hasCount: Bool
+    let isRegionEntry: Bool
     let isGap: Bool
 }

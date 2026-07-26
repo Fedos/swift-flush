@@ -71,7 +71,7 @@ final class CoverageMatcherTests: XCTestCase {
         )
     }
 
-    func testRepeatedLineIsCoveredWhenAnyCountIsNonzero() throws {
+    func testRepeatedLineUsesFirstLineViewCount() throws {
         let source = try makeSourceFile()
 
         let outcome = match(
@@ -88,8 +88,8 @@ final class CoverageMatcherTests: XCTestCase {
             outcome,
             .measured(
                 MeasuredRegionCoverage(
-                    coverage: 0.5,
-                    coveredLineCount: 1,
+                    coverage: 0,
+                    coveredLineCount: 0,
                     executableLineCount: 2,
                     freshness: .fresh
                 )

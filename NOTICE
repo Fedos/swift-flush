@@ -1,8 +1,7 @@
 Flush
 Copyright (c) 2026 Fedor Pudeyan
 
-The following MIT-licensed projects are acknowledged as prior art. This
-bootstrap does not include source code from them.
+The following MIT-licensed projects are acknowledged as prior art.
 
 SlopGuard-Swift
 https://github.com/JeevanThandi/SlopGuard-Swift
@@ -11,7 +10,10 @@ Copyright (c) 2026 crapguard contributors
 crap4swift
 https://github.com/pproenca/crap4swift
 Copyright (c) 2026 Pedro Proença
+CoverageReaders.swift derives LLVM segment normalization from this project.
 
 crap4swift
 https://github.com/JordanCoin/crap4swift
 Copyright (c) 2026 crap4swift contributors
+CoverageReaders.swift derives LLVM line-view normalization and Linux-safe
+process waiting from this project.
