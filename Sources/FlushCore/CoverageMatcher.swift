@@ -44,6 +44,7 @@ public enum CoverageUnavailableReason: Equatable, Sendable {
     case noSourceFileMatch
     case ambiguousSourceFileMatch
     case sourceFileMissing
+    /// The source file has no read permission bit set and is unreadable regardless of the process's privileges.
     case sourceFileUnreadable
     case noExecutableLines
 }
