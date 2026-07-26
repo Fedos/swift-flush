@@ -1,0 +1,19 @@
+excluded:
+  - .build
+
+opt_in_rules:
+  - expiring_todo
+
+cyclomatic_complexity:
+  warning: 10
+  error: 20
+
+expiring_todo:
+  approaching_expiry_severity: warning
+  expired_severity: error
+  bad_formatting_severity: error
+  date_delimiters:
+    opening: "["
+    closing: "]"
+  date_format: "yyyy-MM-dd"
+  date_separator: "-"
