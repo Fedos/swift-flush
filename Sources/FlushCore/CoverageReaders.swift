@@ -1,59 +1,54 @@
-// CoverageReaders normalize explicitly selected LLVM and Xcode inputs.
+// CoverageReaders normalize explicitly selected LLVM inputs.
 
 import Foundation
 
 protocol CommandExecuting: Sendable {
-    func execute(arguments: [String]) throws -> Data
+    func execute(executable: URL, arguments: [String]) throws -> Data
 }
 
-struct XcrunCommandExecutor: CommandExecuting {
-    func execute(arguments: [String]) throws -> Data {
+struct ProcessCommandExecutor: CommandExecuting {
+    func execute(executable: URL, arguments: [String]) throws -> Data {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: directory,
+            withIntermediateDirectories: true
+        )
+        defer {
+            try? FileManager.default.removeItem(at: directory)
+        }
+
+        let outputURL = directory.appendingPathComponent("stdout")
+        let errorURL = directory.appendingPathComponent("stderr")
+        FileManager.default.createFile(atPath: outputURL.path, contents: nil)
+        FileManager.default.createFile(atPath: errorURL.path, contents: nil)
+        let output = try FileHandle(forWritingTo: outputURL)
+        let error = try FileHandle(forWritingTo: errorURL)
+        defer {
+            try? output.close()
+            try? error.close()
+        }
+
         let process = Process()
-        let output = Pipe()
-        let error = Pipe()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+        process.executableURL = executable
         process.arguments = arguments
         process.standardOutput = output
         process.standardError = error
 
         try process.run()
-        let outputData = output.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
+        try output.close()
+        try error.close()
 
         guard process.terminationStatus == 0 else {
-            let message = String(
-                data: error.fileHandleForReading.readDataToEndOfFile(),
-                encoding: .utf8
-            ) ?? ""
+            let message = String(data: try Data(contentsOf: errorURL), encoding: .utf8)
+                ?? ""
             throw CoverageInputError.nativeToolFailed(
-                tool: arguments.first ?? "xcrun",
+                tool: executable.lastPathComponent,
                 message: message.trimmingCharacters(in: .whitespacesAndNewlines)
             )
         }
-        return outputData
-    }
-}
-
-/// Reads either explicitly selected native coverage input.
-public struct CoverageReader: Sendable {
-    private let llvmReader: LLVMCoverageReader
-    private let xcodeReader: XcodeCoverageReader
-
-    /// Creates a native coverage reader.
-    public init() {
-        let executor = XcrunCommandExecutor()
-        llvmReader = LLVMCoverageReader(executor: executor)
-        xcodeReader = XcodeCoverageReader(executor: executor)
-    }
-
-    /// Normalizes the explicitly selected input without searching for artifacts.
-    public func read(_ input: CoverageInput) throws -> CoverageReport {
-        switch input {
-        case let .llvm(input):
-            try llvmReader.read(input)
-        case let .xcode(input):
-            try xcodeReader.read(input)
-        }
+        return try Data(contentsOf: outputURL)
     }
 }
 
@@ -63,7 +58,7 @@ public struct LLVMCoverageReader: Sendable {
 
     /// Creates an LLVM coverage reader.
     public init() {
-        executor = XcrunCommandExecutor()
+        executor = ProcessCommandExecutor()
     }
 
     init(executor: any CommandExecuting) {
@@ -80,72 +75,20 @@ public struct LLVMCoverageReader: Sendable {
             ["-object", $0.path]
         }
         let arguments = [
-            "llvm-cov",
             "export",
             firstBinary.path,
             "-instr-profile",
             input.profile.path
         ] + remainingObjects
-        let data = try executor.execute(arguments: arguments)
+        let data = try executor.execute(
+            executable: input.llvmCovExecutable,
+            arguments: arguments
+        )
         let files = try LLVMCoverageParser().parse(data)
         return CoverageReport(
             files: files,
             successfulRunCompletedAt: completedAt
         )
-    }
-}
-
-/// Reads raw line execution counts from an explicitly selected `.xcresult`.
-public struct XcodeCoverageReader: Sendable {
-    private let executor: any CommandExecuting
-
-    /// Creates an Xcode coverage reader.
-    public init() {
-        executor = XcrunCommandExecutor()
-    }
-
-    init(executor: any CommandExecuting) {
-        self.executor = executor
-    }
-
-    /// Uses `xccov` to normalize coverage from the selected result bundle.
-    public func read(_ input: XcodeCoverageInput) throws -> CoverageReport {
-        let completedAt = try TestRunValidator.validate(input.testRun)
-        let fileListData = try executor.execute(
-            arguments: [
-                "xccov",
-                "view",
-                "--archive",
-                "--file-list",
-                input.resultBundle.path
-            ]
-        )
-        let paths = try XcodeCoverageParser().parseFileList(fileListData)
-        let files = try paths.sorted().map {
-            try readFile(path: $0, resultBundle: input.resultBundle)
-        }
-        return CoverageReport(
-            files: files,
-            successfulRunCompletedAt: completedAt
-        )
-    }
-
-    private func readFile(
-        path: String,
-        resultBundle: URL
-    ) throws -> SourceFileCoverage {
-        let data = try executor.execute(
-            arguments: [
-                "xccov",
-                "view",
-                "--archive",
-                "--file",
-                path,
-                "--json",
-                resultBundle.path
-            ]
-        )
-        return try XcodeCoverageParser().parseFile(data, expectedPath: path)
     }
 }
 
@@ -254,49 +197,4 @@ private struct LLVMSegment {
     let count: Int
     let hasCount: Bool
     let isGap: Bool
-}
-
-struct XcodeCoverageParser {
-    func parseFileList(_ data: Data) throws -> [String] {
-        guard let output = String(data: data, encoding: .utf8) else {
-            throw CoverageInputError.malformedNativeOutput(tool: "xccov")
-        }
-        return output
-            .split(whereSeparator: \.isNewline)
-            .map(String.init)
-    }
-
-    func parseFile(
-        _ data: Data,
-        expectedPath: String
-    ) throws -> SourceFileCoverage {
-        let decoder = JSONDecoder()
-        guard
-            let files = try? decoder.decode(
-                [String: [XcodeLineExecution]].self,
-                from: data
-            ),
-            let lines = files[expectedPath]
-        else {
-            throw CoverageInputError.malformedNativeOutput(tool: "xccov")
-        }
-        return SourceFileCoverage(
-            path: expectedPath,
-            executableLines: lines.compactMap {
-                guard $0.isExecutable else {
-                    return nil
-                }
-                return LineExecution(
-                    line: $0.line,
-                    count: $0.executionCount ?? 0
-                )
-            }
-        )
-    }
-}
-
-private struct XcodeLineExecution: Decodable {
-    let line: Int
-    let isExecutable: Bool
-    let executionCount: Int?
 }

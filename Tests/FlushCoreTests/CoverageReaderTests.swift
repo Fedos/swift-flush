@@ -21,28 +21,14 @@ final class CoverageReaderTests: XCTestCase {
         )
     }
 
-    func testParsesRealXccovArchiveFixture() throws {
-        let path =
-            "/Users/fedor/clip/swift-flush/Sources/FlushCore/FunctionRegion.swift"
-        let file = try XcodeCoverageParser().parseFile(
-            fixtureData(named: "xccov-file"),
-            expectedPath: path
-        )
-
-        XCTAssertEqual(file.path, path)
-        XCTAssertEqual(
-            file.executableLines,
-            (23...28).map { LineExecution(line: $0, count: 21) }
-        )
-    }
-
     func testLLVMReaderUsesOnlyExplicitInputs() throws {
         let binary = URL(fileURLWithPath: "/selected/FlushTests")
         let profile = URL(fileURLWithPath: "/selected/default.profdata")
+        let executable = URL(fileURLWithPath: "/selected/llvm-cov")
         let executor = StubCommandExecutor(
             responses: [
                 [
-                    "llvm-cov",
+                    executable.path,
                     "export",
                     binary.path,
                     "-instr-profile",
@@ -54,6 +40,7 @@ final class CoverageReaderTests: XCTestCase {
 
         let report = try LLVMCoverageReader(executor: executor).read(
             LLVMCoverageInput(
+                llvmCovExecutable: executable,
                 binaries: [binary],
                 profile: profile,
                 testRun: successfulRun(completedAt: completedAt)
@@ -62,42 +49,6 @@ final class CoverageReaderTests: XCTestCase {
 
         XCTAssertEqual(report.files.count, 1)
         XCTAssertEqual(report.successfulRunCompletedAt, completedAt)
-    }
-
-    func testXcodeReaderUsesOnlySelectedResultBundle() throws {
-        let bundle = URL(fileURLWithPath: "/selected/Test.xcresult")
-        let path =
-            "/Users/fedor/clip/swift-flush/Sources/FlushCore/FunctionRegion.swift"
-        let executor = StubCommandExecutor(
-            responses: [
-                [
-                    "xccov",
-                    "view",
-                    "--archive",
-                    "--file-list",
-                    bundle.path
-                ]: Data("\(path)\n".utf8),
-                [
-                    "xccov",
-                    "view",
-                    "--archive",
-                    "--file",
-                    path,
-                    "--json",
-                    bundle.path
-                ]: try fixtureData(named: "xccov-file")
-            ]
-        )
-
-        let report = try XcodeCoverageReader(executor: executor).read(
-            XcodeCoverageInput(
-                resultBundle: bundle,
-                testRun: successfulRun(completedAt: Date())
-            )
-        )
-
-        XCTAssertEqual(report.files.count, 1)
-        XCTAssertEqual(report.files[0].executableLines.count, 6)
     }
 
     func testRejectsFailedOrUnknownTestRunBeforeReadingCoverage() {
@@ -123,13 +74,12 @@ final class CoverageReaderTests: XCTestCase {
     }
 
     func testRejectsSuccessfulRunWithoutCompletionTime() {
-        let reader = XcodeCoverageReader(executor: RejectingCommandExecutor())
+        let reader = LLVMCoverageReader(executor: RejectingCommandExecutor())
 
         XCTAssertThrowsError(
             try reader.read(
-                XcodeCoverageInput(
-                    resultBundle: URL(fileURLWithPath: "/selected/Test.xcresult"),
-                    testRun: TestRunEvidence(
+                llvmInput(
+                    evidence: TestRunEvidence(
                         outcome: .succeeded,
                         completedAt: nil
                     )
@@ -147,28 +97,26 @@ final class CoverageReaderTests: XCTestCase {
         let llvmFiles = try LLVMCoverageParser().parse(
             Data(#"{"data":[{"files":[]}]}"#.utf8)
         )
-        let bundle = URL(fileURLWithPath: "/selected/Empty.xcresult")
-        let xcodeReport = try XcodeCoverageReader(
-            executor: StubCommandExecutor(
-                responses: [
-                    [
-                        "xccov",
-                        "view",
-                        "--archive",
-                        "--file-list",
-                        bundle.path
-                    ]: Data()
-                ]
-            )
-        ).read(
-            XcodeCoverageInput(
-                resultBundle: bundle,
-                testRun: successfulRun(completedAt: Date())
-            )
-        )
 
         XCTAssertTrue(llvmFiles.isEmpty)
-        XCTAssertTrue(xcodeReport.files.isEmpty)
+    }
+
+    func testProcessExecutorCapturesFailureWithoutPipeDeadlock() {
+        let script = "dd if=/dev/zero bs=65536 count=2 >&2; exit 7"
+
+        XCTAssertThrowsError(
+            try ProcessCommandExecutor().execute(
+                executable: URL(fileURLWithPath: "/bin/sh"),
+                arguments: ["-c", script]
+            )
+        ) {
+            guard case let CoverageInputError.nativeToolFailed(tool, message) = $0
+            else {
+                return XCTFail("Expected a native tool failure")
+            }
+            XCTAssertEqual(tool, "sh")
+            XCTAssertGreaterThanOrEqual(message.utf8.count, 131_072)
+        }
     }
 
     private func fixtureData(named name: String) throws -> Data {
@@ -188,6 +136,7 @@ final class CoverageReaderTests: XCTestCase {
         evidence: TestRunEvidence
     ) -> LLVMCoverageInput {
         LLVMCoverageInput(
+            llvmCovExecutable: URL(fileURLWithPath: "/selected/llvm-cov"),
             binaries: [URL(fileURLWithPath: "/selected/FlushTests")],
             profile: URL(fileURLWithPath: "/selected/default.profdata"),
             testRun: evidence
@@ -198,10 +147,10 @@ final class CoverageReaderTests: XCTestCase {
 private struct StubCommandExecutor: CommandExecuting {
     let responses: [[String]: Data]
 
-    func execute(arguments: [String]) throws -> Data {
-        guard let response = responses[arguments] else {
+    func execute(executable: URL, arguments: [String]) throws -> Data {
+        guard let response = responses[[executable.path] + arguments] else {
             throw CoverageInputError.nativeToolFailed(
-                tool: arguments.first ?? "xcrun",
+                tool: executable.lastPathComponent,
                 message: "Unexpected arguments"
             )
         }
@@ -210,9 +159,9 @@ private struct StubCommandExecutor: CommandExecuting {
 }
 
 private struct RejectingCommandExecutor: CommandExecuting {
-    func execute(arguments: [String]) throws -> Data {
+    func execute(executable: URL, arguments: [String]) throws -> Data {
         throw CoverageInputError.nativeToolFailed(
-            tool: arguments.first ?? "xcrun",
+            tool: executable.lastPathComponent,
             message: "Coverage input was read before validation"
         )
     }

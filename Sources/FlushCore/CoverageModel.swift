@@ -75,14 +75,11 @@ public struct CoverageReport: Equatable, Sendable {
     }
 }
 
-/// An explicitly selected native coverage input.
-public enum CoverageInput: Sendable {
-    case llvm(LLVMCoverageInput)
-    case xcode(XcodeCoverageInput)
-}
-
 /// Explicit inputs used to export LLVM source coverage.
 public struct LLVMCoverageInput: Sendable {
+    /// The `llvm-cov` executable selected by the caller.
+    public let llvmCovExecutable: URL
+
     /// Instrumented binaries whose coverage mappings are exported.
     public let binaries: [URL]
 
@@ -94,27 +91,14 @@ public struct LLVMCoverageInput: Sendable {
 
     /// Creates an explicitly selected LLVM coverage input.
     public init(
+        llvmCovExecutable: URL,
         binaries: [URL],
         profile: URL,
         testRun: TestRunEvidence
     ) {
+        self.llvmCovExecutable = llvmCovExecutable
         self.binaries = binaries
         self.profile = profile
-        self.testRun = testRun
-    }
-}
-
-/// An explicitly selected Xcode result-bundle coverage input.
-public struct XcodeCoverageInput: Sendable {
-    /// The `.xcresult` bundle produced by the test run.
-    public let resultBundle: URL
-
-    /// Evidence for the test run that produced the result bundle.
-    public let testRun: TestRunEvidence
-
-    /// Creates an explicitly selected Xcode coverage input.
-    public init(resultBundle: URL, testRun: TestRunEvidence) {
-        self.resultBundle = resultBundle
         self.testRun = testRun
     }
 }
