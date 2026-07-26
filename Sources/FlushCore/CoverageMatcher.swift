@@ -40,7 +40,7 @@ public struct MeasuredRegionCoverage: Equatable, Sendable {
 }
 
 /// The explicit reason coverage could not be measured for a function region.
-public enum CoverageUnavailableReason: Equatable, Sendable {
+public enum CoverageUnavailableReason: Equatable, Hashable, Sendable {
     case noSourceFileMatch
     case ambiguousSourceFileMatch
     case sourceFileMissing
