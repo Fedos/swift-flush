@@ -9,8 +9,20 @@ let package = Package(
         .library(name: "FlushMetrics", targets: ["FlushMetrics"]),
         .executable(name: "flush", targets: ["FlushCLI"])
     ],
+    dependencies: [
+        .package(
+            url: "https://github.com/swiftlang/swift-syntax.git",
+            from: "603.0.0"
+        )
+    ],
     targets: [
-        .target(name: "FlushCore"),
+        .target(
+            name: "FlushCore",
+            dependencies: [
+                .product(name: "SwiftParser", package: "swift-syntax"),
+                .product(name: "SwiftSyntax", package: "swift-syntax")
+            ]
+        ),
         .target(
             name: "FlushMetrics",
             dependencies: ["FlushCore"]
@@ -18,6 +30,10 @@ let package = Package(
         .executableTarget(
             name: "FlushCLI",
             dependencies: ["FlushCore", "FlushMetrics"]
+        ),
+        .testTarget(
+            name: "FlushCoreTests",
+            dependencies: ["FlushCore"]
         ),
         .testTarget(
             name: "FlushMetricsTests",
