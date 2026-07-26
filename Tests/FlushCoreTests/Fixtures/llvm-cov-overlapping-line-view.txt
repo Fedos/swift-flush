@@ -1,0 +1,24 @@
+   74|      4|    public func read(_ input: LLVMCoverageInput) throws -> CoverageReport {
+   75|      4|        let completedAt = try TestRunValidator.validate(input.testRun)
+   76|      1|        guard let firstBinary = input.binaries.first else {
+   77|      0|            throw CoverageInputError.missingLLVMBinary
+   78|      1|        }
+   79|      1|        let remainingObjects = input.binaries.dropFirst().flatMap {
+   80|      0|            ["-object", $0.path]
+   81|      0|        }
+   82|      1|        let arguments = [
+   83|      1|            "export",
+   84|      1|            firstBinary.path,
+   85|      1|            "-instr-profile",
+   86|      1|            input.profile.path
+   87|      1|        ] + remainingObjects
+   88|      1|        let data = try executor.execute(
+   89|      1|            executable: input.llvmCovExecutable,
+   90|      1|            arguments: arguments
+   91|      1|        )
+   92|      1|        let files = try LLVMCoverageParser().parse(data)
+   93|      1|        return CoverageReport(
+   94|      1|            files: files,
+   95|      1|            successfulRunCompletedAt: completedAt
+   96|      1|        )
+   97|      4|    }

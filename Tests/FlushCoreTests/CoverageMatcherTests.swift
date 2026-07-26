@@ -71,25 +71,25 @@ final class CoverageMatcherTests: XCTestCase {
         )
     }
 
-    func testRepeatedLineUsesFirstLineViewCount() throws {
+    func testRepeatedLineIsCoveredWhenAnySampleIsNonzero() throws {
         let source = try makeSourceFile()
 
         let outcome = match(
             path: source.path,
             coveragePath: source.path,
             lines: [
-                LineExecution(line: 2, count: 0),
-                LineExecution(line: 2, count: 4),
-                LineExecution(line: 3, count: 0)
-            ]
+                LineExecution(line: 172, count: 0), LineExecution(line: 172, count: 4),
+                LineExecution(line: 173, count: 0)
+            ],
+            range: 172...173
         )
 
         XCTAssertEqual(
             outcome,
             .measured(
                 MeasuredRegionCoverage(
-                    coverage: 0,
-                    coveredLineCount: 0,
+                    coverage: 0.5,
+                    coveredLineCount: 1,
                     executableLineCount: 2,
                     freshness: .fresh
                 )
@@ -244,6 +244,7 @@ final class CoverageMatcherTests: XCTestCase {
         path: String,
         coveragePath: String,
         lines: [LineExecution],
+        range: ClosedRange<Int> = 2...3,
         completedAt: Date = Date(timeIntervalSinceNow: 60)
     ) -> RegionCoverageOutcome {
         let report = CoverageReport(
@@ -256,7 +257,7 @@ final class CoverageMatcherTests: XCTestCase {
             successfulRunCompletedAt: completedAt
         )
         return CoverageMatcher().match(
-            regions: [region(path: path)],
+            regions: [region(path: path, range: range)],
             report: report
         ).results[0].outcome
     }

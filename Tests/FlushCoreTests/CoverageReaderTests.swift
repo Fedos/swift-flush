@@ -25,24 +25,11 @@ final class CoverageReaderTests: XCTestCase {
         let files = try LLVMCoverageParser().parse(
             fixtureData(named: "llvm-cov-overlapping-segments")
         )
-
-        XCTAssertEqual(
-            files[0].executableLines,
-            [
-                LineExecution(line: 74, count: 4),
-                LineExecution(line: 75, count: 4),
-                LineExecution(line: 76, count: 1),
-                LineExecution(line: 77, count: 0),
-                LineExecution(line: 78, count: 1),
-                LineExecution(line: 79, count: 1),
-                LineExecution(line: 80, count: 0),
-                LineExecution(line: 81, count: 0)
-            ] + (82...96).map {
-                LineExecution(line: $0, count: 1)
-            } + [
-                LineExecution(line: 97, count: 4)
-            ]
+        let lineView = try lineViewFixture(
+            named: "llvm-cov-overlapping-line-view"
         )
+
+        XCTAssertEqual(files[0].executableLines, lineView)
     }
 
     func testLLVMReaderUsesOnlyExplicitInputs() throws {
@@ -144,12 +131,32 @@ final class CoverageReaderTests: XCTestCase {
     }
 
     private func fixtureData(named name: String) throws -> Data {
+        try Data(contentsOf: fixtureURL(named: name, extension: "json"))
+    }
+
+    private func lineViewFixture(named name: String) throws -> [LineExecution] {
+        let contents = try String(
+            contentsOf: fixtureURL(named: name, extension: "txt"),
+            encoding: .utf8
+        )
+        return try contents.split(separator: "\n").map { row in
+            let fields = row.split(
+                separator: "|",
+                maxSplits: 2,
+                omittingEmptySubsequences: false
+            )
+            let line = try XCTUnwrap(Int(fields[0].trimmingCharacters(in: .whitespaces)))
+            let count = try XCTUnwrap(Int(fields[1].trimmingCharacters(in: .whitespaces)))
+            return LineExecution(line: line, count: count)
+        }
+    }
+
+    private func fixtureURL(named name: String, extension: String) throws -> URL {
         let resourceURL = try XCTUnwrap(Bundle.module.resourceURL)
-        let url = resourceURL
+        return resourceURL
             .appendingPathComponent("Fixtures")
             .appendingPathComponent(name)
-            .appendingPathExtension("json")
-        return try Data(contentsOf: url)
+            .appendingPathExtension(`extension`)
     }
 
     private func successfulRun(completedAt: Date) -> TestRunEvidence {
